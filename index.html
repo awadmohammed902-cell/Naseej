@@ -489,6 +489,11 @@
         cache: 'no-store',
         headers:{ 'X-Master-Key': JSONBIN_KEY }
       });
+      if(!res.ok){
+        const errBody = await res.text().catch(()=> '');
+        toast(`فشل تحميل البيانات (كود ${res.status}) — ${errBody.slice(0,80)}`);
+        return;
+      }
       const data = await res.json();
       const record = data.record || {};
       products = record.products || [];
@@ -512,11 +517,15 @@
       return;
     }
     try{
-      await fetch(JSONBIN_URL, {
+      const res = await fetch(JSONBIN_URL, {
         method:'PUT',
         headers:{ 'Content-Type':'application/json', 'X-Master-Key': JSONBIN_KEY },
         body: JSON.stringify({ products, settings })
       });
+      if(!res.ok){
+        const errBody = await res.text().catch(()=> '');
+        toast(`فشل حفظ البيانات (كود ${res.status}) — ${errBody.slice(0,80)}`);
+      }
     }catch(e){
       toast('تعذر حفظ البيانات، تأكد من اتصالك بالإنترنت');
     }

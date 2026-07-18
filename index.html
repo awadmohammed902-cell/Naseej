@@ -475,6 +475,8 @@
   const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
   const configReady = () => JSONBIN_ID !== 'PASTE_YOUR_BIN_ID_HERE' && JSONBIN_KEY !== 'PASTE_YOUR_MASTER_KEY_HERE';
 
+  let dataLoaded = false;
+
   async function loadData(){
     if(!configReady()){
       toast('لسه الموقع محتاج ربط بالتخزين السحابي — راجع تعليمات الإعداد');
@@ -483,14 +485,19 @@
       return;
     }
     try{
-      const res = await fetch(`${JSONBIN_URL}/latest`, { headers:{ 'X-Master-Key': JSONBIN_KEY } });
+      const res = await fetch(`${JSONBIN_URL}/latest?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers:{ 'X-Master-Key': JSONBIN_KEY }
+      });
       const data = await res.json();
       const record = data.record || {};
       products = record.products || [];
       settings = record.settings || { whatsapp:'', pin:'' };
+      dataLoaded = true;
     }catch(e){
-      products = []; settings = { whatsapp:'', pin:'' };
-      toast('تعذر تحميل البيانات، تأكد من اتصالك بالإنترنت');
+      // Keep whatever was already in memory rather than wiping it —
+      // a failed refresh should never look like an empty store.
+      toast('تعذر تحميل البيانات، تأكد من اتصالك بالإنترنت وأعد المحاولة');
     }
     $('waNumber').value = settings.whatsapp || '';
     $('adminPin').value = settings.pin || '';
@@ -500,6 +507,10 @@
 
   async function pushRecord(){
     if(!configReady()) return;
+    if(!dataLoaded){
+      toast('لسه البيانات ما اتحمّلتش من السحابة، حاول تاني كمان لحظة');
+      return;
+    }
     try{
       await fetch(JSONBIN_URL, {
         method:'PUT',

@@ -482,7 +482,7 @@
   // 3) Copy the token and paste it below
   const GITHUB_OWNER = 'awadmohammed902-cell';
   const GITHUB_REPO  = 'Naseej';
-  const GITHUB_TOKEN = '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';
+  const GITHUB_TOKEN = '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';
   const githubReady = () => GITHUB_TOKEN !== 'PASTE_YOUR_GITHUB_TOKEN_HERE';
 
   async function uploadImageToGitHub(base64WithPrefix){
@@ -739,7 +739,7 @@
             uploadedImage = url;
             toast('تم رفع الصورة بنجاح');
           }catch(err){
-            toast('تعذر رفع الصورة، جرّب تاني');
+            toast(`تعذر رفع الصورة — ${(err.message||'').slice(0,120)}`);
             uploadedImage = null;
           }
           imageUploading = false;

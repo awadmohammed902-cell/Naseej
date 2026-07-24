@@ -456,7 +456,8 @@
     const t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
-    setTimeout(()=>t.classList.remove('show'), 2600);
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(()=>t.classList.remove('show'), 4500);
   }
 
   function escapeHtml(str){
@@ -474,6 +475,34 @@
   const JSONBIN_KEY  = '$2a$10$nRJ3JcdVogSuc0jO9tavOOrImC7AlHWZmcrExP4QEAOQolX7K259u';
   const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
   const configReady = () => JSONBIN_ID !== 'PASTE_YOUR_BIN_ID_HERE' && JSONBIN_KEY !== 'PASTE_YOUR_MASTER_KEY_HERE';
+
+  // ---------- image storage on GitHub (free, no size-limit problem) ----------
+  // 1) Go to github.com/settings/personal-access-tokens/new
+  // 2) Give it "Contents" Read and Write permission, scoped to just this repo
+  // 3) Copy the token and paste it below
+  const GITHUB_OWNER = 'awadmohammed902-cell';
+  const GITHUB_REPO  = 'Naseej';
+  const GITHUB_TOKEN = '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';
+  const githubReady = () => GITHUB_TOKEN !== 'PASTE_YOUR_GITHUB_TOKEN_HERE';
+
+  async function uploadImageToGitHub(base64WithPrefix){
+    const base64 = base64WithPrefix.split(',')[1];
+    const path = `images/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${path}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ message: 'إضافة صورة منتج', content: base64 })
+    });
+    if(!res.ok){
+      const errBody = await res.text().catch(()=> '');
+      throw new Error(`GitHub upload failed (${res.status}): ${errBody.slice(0,150)}`);
+    }
+    return `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/${path}`;
+  }
 
   let dataLoaded = false;
 
@@ -524,7 +553,11 @@
       });
       if(!res.ok){
         const errBody = await res.text().catch(()=> '');
-        toast(`فشل حفظ البيانات (كود ${res.status}) — ${errBody.slice(0,80)}`);
+        if(res.status === 403 && errBody.includes('100kb')){
+          toast('وصلت لحد حجم البيانات المسموح به مجانًا. جرّب تحذف صورة من منتج قديم مش مهم، أو قلّل عدد الصور، أو رقّي حسابك على jsonbin.io');
+        }else{
+          toast(`فشل حفظ البيانات (كود ${res.status}) — ${errBody.slice(0,80)}`);
+        }
       }
     }catch(e){
       toast('تعذر حفظ البيانات، تأكد من اتصالك بالإنترنت');
@@ -670,6 +703,8 @@
   });
 
   // ---------- image upload with compression ----------
+  let imageUploading = false;
+
   $('imgDrop').addEventListener('click', ()=> $('imgInput').click());
   $('imgInput').addEventListener('change', (e)=>{
     const file = e.target.files[0];
@@ -677,17 +712,38 @@
     const reader = new FileReader();
     reader.onload = (ev)=>{
       const img = new Image();
-      img.onload = ()=>{
+      img.onload = async ()=>{
         const canvas = document.createElement('canvas');
-        const maxW = 500;
+        const maxW = githubReady() ? 900 : 320;
         const scale = Math.min(1, maxW/img.width);
         canvas.width = img.width*scale;
         canvas.height = img.height*scale;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img,0,0,canvas.width,canvas.height);
-        uploadedImage = canvas.toDataURL('image/jpeg', 0.55);
-        $('imgPreview').src = uploadedImage;
+        const compressed = canvas.toDataURL('image/jpeg', githubReady() ? 0.75 : 0.4);
+
+        // Show a local preview immediately while the real upload happens
+        $('imgPreview').src = compressed;
         $('imgPreview').style.display = 'block';
+
+        if(githubReady()){
+          imageUploading = true;
+          $('imgDrop').textContent = 'جاري رفع الصورة...';
+          try{
+            const url = await uploadImageToGitHub(compressed);
+            uploadedImage = url;
+            toast('تم رفع الصورة بنجاح');
+          }catch(err){
+            toast('تعذر رفع الصورة، جرّب تاني');
+            uploadedImage = null;
+          }
+          imageUploading = false;
+          $('imgDrop').textContent = 'اضغط هنا لاختيار صورة (هيتم ضغطها تلقائيًا)';
+        }else{
+          // No GitHub token configured yet — fall back to storing the
+          // compressed image directly (subject to the 100KB free limit).
+          uploadedImage = compressed;
+        }
       };
       img.src = ev.target.result;
     };
@@ -727,6 +783,7 @@
 
   // ---------- add / edit product ----------
   $('saveProductBtn').addEventListener('click', async ()=>{
+    if(imageUploading){ toast('استنى ثانية، لسه الصورة بترفع'); return; }
     const name = $('pName').value.trim();
     const category = $('pCategory').value;
     const desc = $('pDesc').value.trim();

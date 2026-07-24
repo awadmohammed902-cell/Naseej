@@ -471,7 +471,7 @@
   // 1) Go to https://jsonbin.io and create a free account
   // 2) Create a new Bin with content: {"products":[],"settings":{}}
   // 3) Copy your Bin ID and your X-Master-Key, paste them below
-  const JSONBIN_ID  = '6a5ac322f5f4af5e299ed2b8';
+  const JSONBIN_ID  = '6a63db25f5f4af5e29bd6aa6';
   const JSONBIN_KEY  = '$2a$10$nRJ3JcdVogSuc0jO9tavOOrImC7AlHWZmcrExP4QEAOQolX7K259u';
   const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_ID}`;
   const configReady = () => JSONBIN_ID !== 'PASTE_YOUR_BIN_ID_HERE' && JSONBIN_KEY !== 'PASTE_YOUR_MASTER_KEY_HERE';
@@ -558,6 +558,11 @@
         }else{
           toast(`فشل حفظ البيانات (كود ${res.status}) — ${errBody.slice(0,80)}`);
         }
+        // The save failed, so local state no longer matches what's actually
+        // stored remotely — resync from the real data instead of leaving
+        // the UI showing an "add/delete" that never actually persisted.
+        await loadData();
+        renderMiniList();
       }
     }catch(e){
       toast('تعذر حفظ البيانات، تأكد من اتصالك بالإنترنت');
